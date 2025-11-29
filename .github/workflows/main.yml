@@ -1,126 +1,143 @@
-steps:
-  # 0. Set Image Name (Force Lowercase)
-  - name: Set Image Name
-    run: |
-      OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-      # ⚠️ Ganti Image Name ke n8n punya lu
-      echo "IMAGE_NAME=ghcr.io/${OWNER}/n8n-workflow-space:latest" >> $GITHUB_ENV
-      echo "CONTAINER_NAME=n8n-server" >> $GITHUB_ENV
+# Nama Workflow lu (Bebas)
+name: 🚀 N8N Workflow Runner
 
-  # 1. 🔑 Generate Random Password (16 Karakter)
-  - name: Generate Random Password
-    id: password
-    run: |
-      # Generate random string (base64 12 byte = 16 char)
-      RANDOM_PASS=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | head -c 16)
-      echo "Generated Password: $RANDOM_PASS"
-      # Set sebagai output buat dipakai di step New Game
-      echo "random_password=$RANDOM_PASS" >> $GITHUB_OUTPUT
+# Kapan workflow ini jalan (Contoh: Manual dari web atau setiap push)
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [ main ]
 
-  # 2. 🧹 BERSIH-BERSIH STORAGE (WAJIB DI AWAL)
-  - name: 🧹 Free Disk Space (Maximize Storage)
-    run: |
-      echo "💾 Storage Sebelum Diet:"
-      df -h
-      
-      # Hapus sampah bawaan GitHub runner
-      sudo rm -rf /usr/share/dotnet
-      sudo rm -rf /usr/local/lib/android
-      sudo rm -rf /opt/ghc
-      sudo rm -rf /usr/share/swift
-      sudo docker image prune --all --force
-      
-      echo "💾 Storage Setelah Diet:"
-      df -h
+# 💡 INI YANG HILANG! Semua langkah harus di bawah jobs.
+jobs:
+  # Nama Job lu (Bebas)
+  run-n8n:
+    # Runner yang dipakai
+    runs-on: ubuntu-latest
 
-  # 3. Login GHCR
-  - name: Login GHCR
-    uses: docker/login-action@v3
-    with:
-      registry: ghcr.io
-      username: ${{ github.actor }}
-      password: ${{ secrets.GITHUB_TOKEN }}
-
-  # 4. Load Save / New Game
-  - name: Load Save Data
-    # Ambil random password dari step 'password'
-    env:
-      N8N_PASS: ${{ steps.password.outputs.random_password }}
-    run: |
-      # ⚠️ Pastikan IMAGE_NAME di step 0 udah lu ganti
-      if docker manifest inspect $IMAGE_NAME > /dev/null 2>&1; then
-        echo "✅ SAVE DATA DITEMUKAN! Loading n8n container..."
-        docker pull $IMAGE_NAME
-        
-        # --- LOAD GAME (Pakai n8n image yang udah di-save) ---
-        docker run -d \
-          --name ${{ env.CONTAINER_NAME }} \
-          -p 5678:5678 \
-          --restart=always \
-          --hostname="N8N-Workflow-God-Box" \
-          -e TZ="Asia/Jakarta" \
-          -e N8N_HOST="n8n.domain-lu.com" \
-          -e WEBHOOK_URL="https://n8n.domain-lu.com/" \
-          -e N8N_BASIC_AUTH_ACTIVE=true \
-          -e N8N_BASIC_AUTH_USER="justfish" \
-          -e N8N_BASIC_AUTH_PASSWORD="${{ env.N8N_PASS }}" \
-          $IMAGE_NAME
+    # Di sini baru lu taro semua steps yang udah lu buat
+    steps:
+      # 0. Set Image Name (Force Lowercase)
+      - name: Set Image Name
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          # ⚠️ Ganti Image Name ke n8n punya lu
+          echo "IMAGE_NAME=ghcr.io/${OWNER}/n8n-workflow-space:latest" >> $GITHUB_ENV
+          echo "CONTAINER_NAME=n8n-server" >> $GITHUB_ENV
           
-      else
-        echo "🆕 SAVE DATA KOSONG. New Game..."
-        
-        # --- NEW GAME (Pakai official n8nio/n8n:latest) ---
-        docker run -d \
-          --name ${{ env.CONTAINER_NAME }} \
-          -p 5678:5678 \
-          --restart=always \
-          --hostname="N8N-Workflow-God-Box" \
-          -e TZ="Asia/Jakarta" \
-          # ⚠️ Ganti port dari 8080 (VSCode) ke 5678 (n8n)
-          # ⚠️ Ganti domain di bawah ini sesuai punya lu
-          -e N8N_HOST="n8n.ikhsantrx.web.id" \
-          -e WEBHOOK_URL="https://n8n.ikhsantrx.web.id" \
-          -e N8N_BASIC_AUTH_ACTIVE=true \
-          -e N8N_BASIC_AUTH_USER="justfish" \
-          -e N8N_BASIC_AUTH_PASSWORD="${{ env.N8N_PASS }}" \
-          n8nio/n8n:latest
+      # 1. 🔑 Generate Random Password (16 Karakter)
+      - name: Generate Random Password
+        id: password
+        run: |
+          # Generate random string (base64 12 byte = 16 char)
+          RANDOM_PASS=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | head -c 16)
+          echo "Generated Password: $RANDOM_PASS"
+          # Set sebagai output buat dipakai di step New Game
+          echo "random_password=$RANDOM_PASS" >> $GITHUB_OUTPUT
           
-      fi
-
-  # 5. Install & Start Cloudflare Tunnel (Manual Binary)
-  - name: Install & Start Tunnel
-    run: |
-      echo "⬇️ Downloading Cloudflared..."
-      curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-      sudo dpkg -i cloudflared.deb
-
-      echo "🚇 Starting Tunnel..."
-      # Tunnel HTTP buat n8n (port 5678)
-      cloudflared tunnel run --token ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }} --url http://localhost:5678 > tunnel.log 2>&1 &
-
-  # 6. Sesi Aktif (5 Jam)
-  - name: ⏳ Sesi Aktif (5 Jam)
-    continue-on-error: true
-    # Ambil random password dari step 'password'
-    env:
-      N8N_PASS: ${{ steps.password.outputs.random_password }}
-    run: |
-      # ⚠️ Ganti link akses lu di sini
-      echo "🚀 LINK AKSES N8N: https://n8n.domain-lu.com"
-      echo "👤 USERNAME: **justfish**"
-      echo "🔑 PASSWORD: **${{ env.N8N_PASS }}**"
-      echo "---"
-      echo "⚠️ Catat password ini. Setelah sesi berakhir, password akan hilang!"
-      sleep 18000 # 5 Jam
-
-  # 7. Auto Save (Jalan Terus)
-  - name: 💾 SAVE GAME (Commit & Push)
-    if: always()
-    run: |
-      echo "💾 Menyimpan progress..."
-      docker commit \
-        --change='LABEL org.opencontainers.image.source=https://github.com/${{ github.repository }}' \
-        ${{ env.CONTAINER_NAME }} ${{ env.IMAGE_NAME }}
-        
-      docker push ${{ env.IMAGE_NAME }}
-      echo "✅ Progress tersimpan!"
+      # 2. 🧹 BERSIH-BERSIH STORAGE (WAJIB DI AWAL)
+      - name: 🧹 Free Disk Space (Maximize Storage)
+        run: |
+          echo "💾 Storage Sebelum Diet:"
+          df -h
+          
+          # Hapus sampah bawaan GitHub runner
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/share/swift
+          sudo docker image prune --all --force
+          
+          echo "💾 Storage Setelah Diet:"
+          df -h
+          
+      # 3. Login GHCR
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      # 4. Load Save / New Game
+      - name: Load Save Data
+        # Ambil random password dari step 'password'
+        env:
+          N8N_PASS: ${{ steps.password.outputs.random_password }}
+        run: |
+          # ⚠️ Pastikan IMAGE_NAME di step 0 udah lu ganti
+          if docker manifest inspect $IMAGE_NAME > /dev/null 2>&1; then
+            echo "✅ SAVE DATA DITEMUKAN! Loading n8n container..."
+            docker pull $IMAGE_NAME
+            
+            # --- LOAD GAME (Pakai n8n image yang udah di-save) ---
+            docker run -d \
+              --name ${{ env.CONTAINER_NAME }} \
+              -p 5678:5678 \
+              --restart=always \
+              --hostname="N8N-Workflow-God-Box" \
+              -e TZ="Asia/Jakarta" \
+              -e N8N_HOST="n8n.domain-lu.com" \
+              -e WEBHOOK_URL="https://n8n.domain-lu.com/" \
+              -e N8N_BASIC_AUTH_ACTIVE=true \
+              -e N8N_BASIC_AUTH_USER="justfish" \
+              -e N8N_BASIC_AUTH_PASSWORD="${{ env.N8N_PASS }}" \
+              $IMAGE_NAME
+              
+          else
+            echo "🆕 SAVE DATA KOSONG. New Game..."
+            
+            # --- NEW GAME (Pakai official n8nio/n8n:latest) ---
+            docker run -d \
+              --name ${{ env.CONTAINER_NAME }} \
+              -p 5678:5678 \
+              --restart=always \
+              --hostname="N8N-Workflow-God-Box" \
+              -e TZ="Asia/Jakarta" \
+              # ⚠️ Ganti port dari 8080 (VSCode) ke 5678 (n8n)
+              # ⚠️ Ganti domain di bawah ini sesuai punya lu
+              -e N8N_HOST="n8n.ikhsantrx.web.id" \
+              -e WEBHOOK_URL="https://n8n.ikhsantrx.web.id" \
+              -e N8N_BASIC_AUTH_ACTIVE=true \
+              -e N8N_BASIC_AUTH_USER="justfish" \
+              -e N8N_BASIC_AUTH_PASSWORD="${{ env.N8N_PASS }}" \
+              n8nio/n8n:latest
+              
+          fi
+          
+      # 5. Install & Start Cloudflare Tunnel (Manual Binary)
+      - name: Install & Start Tunnel
+        run: |
+          echo "⬇️ Downloading Cloudflared..."
+          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
+          
+          echo "🚇 Starting Tunnel..."
+          # Tunnel HTTP buat n8n (port 5678)
+          cloudflared tunnel run --token ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }} --url http://localhost:5678 > tunnel.log 2>&1 &
+          
+      # 6. Sesi Aktif (5 Jam)
+      - name: ⏳ Sesi Aktif (5 Jam)
+        continue-on-error: true
+        # Ambil random password dari step 'password'
+        env:
+          N8N_PASS: ${{ steps.password.outputs.random_password }}
+        run: |
+          # ⚠️ Ganti link akses lu di sini
+          echo "🚀 LINK AKSES N8N: https://n8n.ikhsantrx.web.id"
+          echo "👤 USERNAME: **justfish**"
+          echo "🔑 PASSWORD: **${{ env.N8N_PASS }}**"
+          echo "---"
+          echo "⚠️ Catat password ini. Setelah sesi berakhir, password akan hilang!"
+          sleep 18000 # 5 Jam
+          
+      # 7. Auto Save (Jalan Terus)
+      - name: 💾 SAVE GAME (Commit & Push)
+        if: always()
+        run: |
+          echo "💾 Menyimpan progress..."
+          docker commit \
+            --change='LABEL org.opencontainers.image.source=https://github.com/${{ github.repository }}' \
+            ${{ env.CONTAINER_NAME }} ${{ env.IMAGE_NAME }}
+            
+          docker push ${{ env.IMAGE_NAME }}
+          echo "✅ Progress tersimpan!"
