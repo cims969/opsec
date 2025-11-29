@@ -26,11 +26,11 @@ jobs:
       packages: write
 
     steps:
-      # 0. Set Image Name (Force Lowercase)
+      # 0. Set Image Name (Force Lowercase) - FIX 1: GITHUB_ENV harus kapital
       - name: set image name
         run: |
           owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          echo "IMAGE_NAME=ghcr.io/${owner}/n8n-workspace:latest" >> $github_env
+          echo "IMAGE_NAME=ghcr.io/${owner}/n8n-workspace:latest" >> $GITHUB_ENV
 
       # 1. 🧹 bersih-bersih storage
       - name: free disk space
@@ -131,21 +131,26 @@ jobs:
             sleep 60
           done
 
-      # 6. auto save
+      # 6. auto save - FIX 2: cek container sebelum commit
       - name: save progress
         if: always()
         run: |
-          echo "💾 menyimpan n8n workspace..."
-          
-          # commit the container data volume to the image
-          docker commit \
-            --change='label org.opencontainers.image.source=https://github.com/${{ github.repository }}' \
-            --change='label org.opencontainers.image.description=n8n automation workspace' \
-            --change='volume /home/node/.n8n' \
-            $CONTAINER_NAME $IMAGE_NAME
-          
-          docker push $IMAGE_NAME
-          
-          # clean up volume after saving
-          docker volume rm $N8N_DATA_VOLUME
-          echo "✅ progress tersimpan ke ghcr dan volume dibersihkan!"
+          # cek apakah container n8n-runner masih ada dan berjalan
+          if docker ps -a --format '{{.Names}}' | grep -q $CONTAINER_NAME; then
+            echo "💾 menyimpan n8n workspace..."
+            
+            # commit the container data volume to the image
+            docker commit \
+              --change='label org.opencontainers.image.source=https://github.com/${{ github.repository }}' \
+              --change='label org.opencontainers.image.description=n8n automation workspace' \
+              --change='volume /home/node/.n8n' \
+              $CONTAINER_NAME $IMAGE_NAME
+            
+            docker push $IMAGE_NAME
+            
+            # clean up volume after saving
+            docker volume rm $N8N_DATA_VOLUME
+            echo "✅ progress tersimpan ke ghcr dan volume dibersihkan!"
+          else
+            echo "⚠️ container $CONTAINER_NAME tidak ditemukan. tidak ada progress yang disimpan."
+          fi
