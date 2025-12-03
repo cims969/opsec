@@ -20,7 +20,7 @@ jobs:
           
           # === CONFIG TAHUN & BULAN DISINI ===
           YEAR=2025
-          MONTH=01 # Ganti 02 buat Februari, dst
+          MONTH=02 # Ganti 02 buat Februari, dst
           DAYS_IN_MONTH=31 
           # ===================================
 
