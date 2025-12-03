@@ -1,0 +1,64 @@
+name: Random Month Filler 📅
+
+on:
+  workflow_dispatch: # Klik manual tombol Play
+
+jobs:
+  fill_calendar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Generate Organic Commits
+        run: |
+          git config --global user.name "cims969"
+          git config --global user.email "vimsecc@proton.me"
+          
+          # === CONFIG TAHUN & BULAN DISINI ===
+          YEAR=2025
+          MONTH=01 # Ganti 02 buat Februari, dst
+          DAYS_IN_MONTH=31 
+          # ===================================
+
+          echo "Mulai memalsukan sejarah bulan $MONTH-$YEAR..."
+
+          # List pesan sok sibuk
+          MSGS=("Refactor backend" "Fix typography" "Update readme" "Optimize query" "Merge branch" "Cleanup code" "Init module" "Bug fix" "WIP feature" "Unit test update")
+
+          # Loop dari tanggal 1 sampai 31
+          for DAY in $(seq 1 $DAYS_IN_MONTH)
+          do
+             # 1. Gacha Nasib (0-100)
+             # Kalau angkanya di bawah 30, SKIP hari ini (Libur)
+             if [ $((RANDOM % 100)) -lt 30 ]; then
+                echo "Tanggal $DAY: Skip (Pura-pura healing)"
+                continue
+             fi
+
+             # 2. Gacha Jumlah Commit (1 sampai 12 commit sehari)
+             COMMIT_COUNT=$(( (RANDOM % 12) + 1 ))
+             
+             echo "Tanggal $DAY: Nge-gas $COMMIT_COUNT commit"
+
+             for ((i=1; i<=COMMIT_COUNT; i++))
+             do
+                # Random Jam (09:00 - 23:00)
+                HOUR=$(( (RANDOM % 14) + 9 ))
+                # Random Menit
+                MINUTE=$((RANDOM % 59))
+                
+                # Pilih pesan acak
+                MSG=${MSGS[$RANDOM % ${#MSGS[@]}]}
+
+                # Eksekusi Commit
+                git commit --allow-empty --date="$YEAR-$MONTH-$DAY $HOUR:$MINUTE:00" -m "$MSG"
+             done
+          done
+          
+          # === JURUS ANTI ERROR ===
+          git pull --rebase origin main
+          git push
