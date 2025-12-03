@@ -1,89 +1,47 @@
-name: 'Jupyter-in-Docker via Cloudflare Tunnel'
+name: myReactApp
 
 on:
-  # Lo bisa ganti trigger sesuai kebutuhan (misalnya: push ke main, atau manual dispatch)
-  workflow_dispatch:
-    inputs:
-      domain:
-        description: 'Subdomain yang akan digunakan (misal: jupyter.yourdomain.com)'
-        required: true
-        type: string
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 */1 * * *' # Jalan tiap 6 jam
 
 jobs:
-  run-jupyter:
+  auto_commit:
     runs-on: ubuntu-latest
-    
-    # Environment variables biar nggak ribet ganti-ganti
-    env:
-      CONTAINER_NAME: jupyter-lab
-      JUPYTER_PORT: 8888
-
+    permissions:
+      contents: write
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Build and Run Docker Container (Jupyter Lab)
+      - uses: actions/checkout@v3
+      
+      - name: Update Activity Log
         run: |
-          # 1. Build image Dockerfile (asumsi Dockerfile lo ada di root repo)
-          echo "Building Docker image..."
-          docker build -t jupyter-image .
+          # Bikin perubahan di file biar ada yang di-commit
+          echo "System check: $(date)" >> activity_log.txt
           
-          # 2. Run container. Jupyter biasanya jalan di port 8888.
-          #    --rm: hapus container setelah stop
-          #    -d: detach (jalan di background)
-          echo "Starting Jupyter container..."
-          docker run -d \
-            --name ${{ env.CONTAINER_NAME }} \
-            -p ${{ env.JUPYTER_PORT }}:${{ env.JUPYTER_PORT }} \
-            jupyter-image \
-            jupyter lab --ip=0.0.0.0 --allow-root --no-browser
-          
-          # 3. Tunggu sebentar biar Jupyter beneran up (opsional, tapi aman)
-          sleep 10
-          echo "Jupyter Lab container is running."
-
-      - name: Setup Cloudflare Tunnel (Tunneling Service)
-        uses: cloudflare/action-tunnel@v3
-        with:
-          # Secret ini harus lo set di Settings -> Secrets
-          # CF_TUNNEL_TOKEN: Token Tunnel dari dashboard Cloudflare lo
-          token: ${{ secrets.CF_TUNNEL_TOKEN }}
-          # Domain yang diinput saat workflow dijalankan
-          hostname: ${{ github.event.inputs.domain }}
-          # Target traffic: arahin ke port container Jupyter yang sudah kita expose
-          url: http://localhost:${{ env.JUPYTER_PORT }}
-          
-      - name: Get Jupyter Access Info
-        # Step ini penting buat lo tau URL dan token aksesnya
+      - name: Commit & Push Random Message
         run: |
-          echo "--- 🚀 Jupyter is now accessible via Cloudflare Tunnel 🚀 ---"
-          echo "URL Akses: https://${{ github.event.inputs.domain }}"
-          echo "---"
+          git config --global user.name "cims969"
+          git config --global user.email "email_asli_lu@gmail.com"
           
-          # Ambil token dari logs container Jupyter
-          JUPYTER_LOG=$(docker logs ${{ env.CONTAINER_NAME }} 2>&1 | grep 'token=')
+          # Ini array pesan-pesan dewa tadi
+          MSGS=(
+          "Refactor core logic for better performance latency" 
+          "Optimize database query execution time" 
+          "Fix race condition in async handler" 
+          "Update internal dependencies to latest stable version" 
+          "Enhance security middleware integration" 
+          "Code cleanup: remove deprecated legacy functions" 
+          "Refactor API response structure for scalability" 
+          "Improve error logging mechanism pipeline" 
+          "Hotfix: Resolve memory leak in background worker" 
+          "Minor UI adjustments based on UX research"
+          )
           
-          if [[ $JUPYTER_LOG ]]; then
-            # Coba ambil token paling bawah/baru
-            JUPYTER_TOKEN=$(echo "$JUPYTER_LOG" | tail -n 1 | awk -F'token=' '{print $2}' | awk '{print $1}')
-            echo "Token Akses (Wajib!): ${JUPYTER_TOKEN}"
-          else
-            echo "⚠️ Warning: Gagal otomatis ambil token. Cek logs container: docker logs ${{ env.CONTAINER_NAME }}"
-          fi
+          # Pilih satu secara acak
+          RANDOM_MSG=${MSGS[$RANDOM % ${#MSGS[@]}]}
           
-          echo "---"
-          echo "Container ini akan tetap berjalan selama GitHub Action ini berjalan."
-          echo "Lo bisa akses sekarang."
-
-      - name: Keep Tunnel Active (Hold the Action)
-        # Trik buat nahan workflow ini biar tunnel-nya nggak langsung mati
-        run: |
-          echo "Keeping tunnel active. Press Ctrl+C locally to stop."
-          # Tahan selama 6 jam (maksimal action runner)
-          sleep 6h
-          
-      - name: Stop and Cleanup Container (After Action Finishes)
-        if: always()
-        run: |
-          echo "Stopping Jupyter container..."
-          docker stop ${{ env.CONTAINER_NAME }} || true
+          git add activity_log.txt
+          git commit -m "$RANDOM_MSG"
+          git push
